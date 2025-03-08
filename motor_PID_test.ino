@@ -11,7 +11,7 @@
 */
 struct Drivemotor{
   public:
-  static Drivemotor* instance;   // Static instance pointer for ISR
+  //static Drivemotor* instance;   // Static instance pointer for ISR
   //pins
   byte enPin; //enable
   byte dir1Pin; //direction
@@ -50,7 +50,7 @@ struct Drivemotor{
     pinMode(pwmPin,OUTPUT);
     pinMode(Apin,INPUT_PULLUP); //maybe just regular inputs?
     pinMode(Bpin,INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(Apin),ISRfunction,RISING);
+    //attachInterrupt(digitalPinToInterrupt(Apin),ISRfunction,RISING);
     pid.SetMode(AUTOMATIC);
   }
 
@@ -90,71 +90,66 @@ struct Drivemotor{
 
   void PIDmove(double s){
     setpoint = s;
+    pid.SetOutputLimits(s-256,s+256);
     pid.Compute();
     //constrain and separate output
     int mag = abs(output);
     int dir = output/mag; //forward or reverse
     move(mag, dir);
   }
-
-  void test(){
-    Serial.print(instance->BpinState);
-    Serial.print(' ');
-    Serial.println(BpinState);
-    Serial.print(instance->pwmPin);
-    Serial.print(' ');
-    Serial.println(pwmPin);
-    
-  }
-
-  private:
-
-  static void ISRfunction(){
-    //the interrupt is triggered by the A signal
-    //direction is determined by the B signal  
-      instance->BpinState = digitalRead(instance->Bpin);
-      if(instance->BpinState == true){
-        instance->encoderCount++;
-      }else{
-        instance->encoderCount--;
-      }
-
-      
-    
-
-  }
-
 };
 
-
-Drivemotor* Drivemotor::instance = nullptr; //idk chatGPT gave it to me :/
-
-
-//void driveMotorPWM(Drivemotor m, int setpoint,);
-
 Drivemotor leftDrive;
+Drivemotor rightDrive;
+
+void leftEncoder(){
+  //the interrupt is triggered by the A signal
+  //direction is determined by the B signal  
+    leftDrive.BpinState = digitalRead(leftDrive.Bpin);
+    if(leftDrive.BpinState == true){
+      leftDrive.encoderCount++;
+    }else{
+      leftDrive.encoderCount--;
+    }
+
+}
+
+void rightEncoder(){
+  //the interrupt is triggered by the A signal
+  //direction is determined by the B signal  
+    rightDrive.BpinState = digitalRead(rightDrive.Bpin);
+    if(rightDrive.BpinState == true){
+      rightDrive.encoderCount++;
+    }else{
+      rightDrive.encoderCount--;
+    }
+
+}
 
 void setup() {
   Serial.begin(115200);
   // put your setup code here, to run once:
   leftDrive.initialize(52,10,11,9,20,21);
-  leftDrive.maxSpeed = 100;
+  attachInterrupt(digitalPinToInterrupt(leftDrive.Apin),leftEncoder,RISING);
+  leftDrive.maxSpeed = 255;
   leftDrive.enable();
-  leftDrive.pid.SetTunings(1.0, 0, 0);
-  leftDrive.test();
+  leftDrive.pid.SetTunings(1.11,4.44,0.07); //1.85 for ultamate gain
+
+  rightDrive.initialize(50,13,12,3,19,18);
+  attachInterrupt(digitalPinToInterrupt(rightDrive.Apin),rightEncoder,RISING);
+  rightDrive.maxSpeed = 255;
+  rightDrive.enable();
+  rightDrive.pid.SetTunings(1.11,4.44,0.07); //1.85 for ultamate gain
+  
 }
 
-double pencoder = leftDrive.encoderCount;
 
 void loop() {
   // put your main code here, to run repeatedly:
-  leftDrive.move(50,0);
-  // if(leftDrive.encoderCount != pencoder){
-  //   Serial.println(leftDrive.encoderCount);
-  //   pencoder = leftDrive.encoderCount;
-  // }
-  //Serial.println(leftDrive.encoderCount);
-  //leftDrive.PIDmove(100);//100 encoder ticks
-  //Serial.println(leftDrive.encoderCount);
+  //leftDrive.move(50,0);
+  
+  leftDrive.PIDmove(200);//encoder ticks
+  rightDrive.PIDmove(-200);
+  
   delay(10);
 }
